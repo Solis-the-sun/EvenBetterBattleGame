@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini RPG — CSS Characters & Shop</title>
+<style>
+  :root{
+    --bg:#071226; --card:#0c1724; --muted:#9fb0c8; --accent:#7dd3fc;
+    --hp-good:#34d399; --hp-bad:#ef4444; --panel:#0f1b2b;
+    --gold:#f6c85a;
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Arial; color: #e6f0fb; }
+  body{margin:0;min-height:100vh;background:
+    radial-gradient(800px 200px at 10% 10%, rgba(125,211,252,0.04), transparent 10%),
+    linear-gradient(180deg,var(--bg), #041224 90%);
+    display:flex;align-items:center;justify-content:center;padding:20px;}
+
+  .game {
+    width:980px; max-width:96vw;
+    display:grid; grid-template-columns: 1fr 360px; gap:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
+    border-radius:12px; padding:18px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  }
+
+  /* LEFT: battlefield */
+  .battle {
+    background: linear-gradient(180deg,#071a2b,#071428 60%);
+    border-radius:10px; padding:14px; min-height:540px; position:relative; overflow:hidden;
+  }
+  .arena {
+    height:380px; border-radius:8px; background: linear-gradient(180deg,#062235,#081a2a 70%);
+    display:flex; align-items:end; justify-content:space-between; padding:28px;
+    position:relative;
+  }
+  .char {
+    width:220px; text-align:center; position:relative;
+  }
+  .sprite {
+    width:160px; height:160px; margin:0 auto 8px; position:relative; display:flex; align-items:center; justify-content:center;
+    border-radius:12px; box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+    transition: transform 180ms ease;
+  }
+
+  .player .sprite{ background: linear-gradient(180deg,#113a5a,#0b2f4a); }
+  .enemy .sprite { background: linear-gradient(180deg,#3b1f2a,#2a1120); }
+
+  .name { font-size:14px; color:var(--muted); margin-bottom:6px; }
+  .hpbar { height:14px; background:rgba(255,255,255,0.04); border-radius:10px; overflow:hidden; }
+  .hp { height:100%; width:100%; background:linear-gradient(90deg,var(--hp-good), #10b981); transition: width 400ms linear; }
+  .hp.low { background:linear-gradient(90deg,var(--hp-bad), #ef4444); }
+
+  /* CSS-drawn character parts */
+  .shape {
+    width:96px; height:96px; position:relative; display:inline-block;
+  }
+  /* circle face */
+  .shape.circle { border-radius:50%; background:var(--c, #f97316); box-shadow: inset 0 -8px rgba(0,0,0,0.15); }
+  /* square body */
+  .shape.square { border-radius:12px; background:var(--c, #06b6d4); }
+  /* triangle (CSS) */
+  .shape.triangle {
+    width: 0; height: 0; border-left:48px solid transparent; border-right:48px solid transparent;
+    border-bottom:96px solid var(--c, #ef4444); display:inline-block;
+  }
+  /* horns for some enemies */
+  .horns { position:absolute; left:8px; top:-8px; width:0;height:0; border-left:12px solid transparent; border-right:12px solid transparent; border-bottom:18px solid rgba(0,0,0,0.12); transform:rotate(-20deg); }
+  .horns.right { left:auto; right:8px; transform:rotate(20deg); }
+
+  /* HUD / right column */
+  .hud { display:flex; flex-direction:column; gap:12px; }
+  .panel { background:var(--panel); padding:12px; border-radius:10px; }
+  .actions { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  button { padding:12px; border-radius:8px; border:0; background:#0f2a3e; color:#dbeafe; cursor:pointer; font-weight:700; }
+  button:active { transform: translateY(2px); }
+  button[disabled] { opacity:0.45; cursor:not-allowed; }
+
+  .log { height:170px; overflow:auto; background:#05121a; padding:8px; border-radius:8px; color:var(--muted); font-size:13px; }
+  .center { text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; }
+
+  /* projectile and damage */
+  .projectile { position:absolute; width:18px; height:18px; border-radius:50%; background: radial-gradient(circle at 30% 30%, #fff6c8, #ffd166); box-shadow: 0 6px 16px rgba(255,150,50,0.45); pointer-events:none; transform:translate(-50%,-50%); }
+  .damage { position:absolute; font-weight:800; font-size:20px; color:#ffd8d8; text-shadow:0 2px 6px rgba(0,0,0,0.6); transform:translate(-50%,-50%); pointer-events:none; animation:rise 900ms ease-out forwards; }
+  @keyframes rise { 0% { opacity:1; transform:translate(-50%,0) scale(1);} 100% { opacity:0; transform:translate(-50%,-80px) scale(1.05);} }
+
+  .flash { position:absolute; inset:0; border-radius:10px; background:rgba(255,255,255,0.06); pointer-events:none; animation:flash 220ms linear; }
+  @keyframes flash { from { opacity:1;} to { opacity:0; } }
+
+  /* Shop list */
+  .shop-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 6px; border-radius:8px; background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent); margin-bottom:8px; }
+  .gold { color:var(--gold); font-weight:800; }
+
+  /* overlay */
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:80; }
+  .overlay .card { background:linear-gradient(180deg,#071a2b,#081422); border-radius:12px; padding:18px; box-shadow:0 18px 40px rgba(0,0,0,0.7); text-align:center; width:340px; }
+
+  @media (max-width:880px) {
+    .game { grid-template-columns: 1fr; }
+    .arena { padding:18px; }
+  }
+</style>
+</head>
+<body>
+  <div class="game" id="game">
+    <div class="battle">
+      <div class="arena" id="arena">
+        <!-- Player -->
+        <div class="char player" id="playerChar">
+          <div class="sprite" id="playerSprite">
+            <div class="shape circle" id="playerShape" style="--c:#2dd4bf"></div>
+          </div>
+          <div class="name">Hero • <span id="pLevel">1</span></div>
+          <div class="hpbar" style="margin-top:8px;"><div class="hp" id="pHP" style="width:100%"></div></div>
+          <div style="margin-top:6px; font-size:13px; color:var(--muted)">HP <span id="pHPtext">120</span> / <span id="pMaxHP">120</span></div>
+        </div>
+
+        <!-- Enemy -->
+        <div class="char enemy" id="enemyChar">
+          <div class="sprite" id="enemySprite">
+            <!-- css shape injected dynamically -->
+            <div id="enemyShapeWrap"></div>
+          </div>
+          <div class="name"><span id="eName">Goblin</span> • <span id="eLevel">1</span></div>
+          <div class="hpbar" style="margin-top:8px;"><div class="hp" id="eHP" style="width:100%"></div></div>
+          <div style="margin-top:6px; font-size:13px; color:var(--muted)">HP <span id="eHPtext">90</span> / <span id="eMaxHP">90</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:12px;">
+        <div class="panel" style="flex:1;">
+          <div style="display:flex;justify-content:space-between;gap:10px;">
+            <div><div class="small muted" style="font-size:12px;color:var(--muted)">Turn</div><div id="turnText" style="font-weight:800">Player</div></div>
+            <div><div class="small muted" style="font-size:12px;color:var(--muted)">Round</div><div id="roundText" style="font-weight:800">1</div></div>
+            <div><div class="small muted" style="font-size:12px;color:var(--muted)">Enemy Mood</div><div id="enemyMood" style="font-weight:800">Neutral</div></div>
+          </div>
+        </div>
+
+        <div class="panel" style="width:220px;">
+          <div style="font-size:13px;color:var(--muted)">Player XP</div>
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px;">
+            <div style="flex:1;background:#071a2b;border-radius:8px;padding:6px;">
+              <div id="xpBar" style="height:10px;background:linear-gradient(90deg,#3b82f6,#7dd3fc);border-radius:6px;width:0%;transition:width 400ms linear"></div>
+            </div>
+            <div style="min-width:60px;text-align:right;font-weight:800" id="xpText">0 / 50</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:13px;color:var(--muted)">Level</div>
+            <div style="font-weight:800" id="hudLevel">1</div>
+          </div>
+          <div>
+            <div style="font-size:13px;color:var(--muted)">Gold</div>
+            <div style="font-weight:800" id="hudGold">0</div>
+          </div>
+          <div>
+            <div style="font-size:13px;color:var(--muted)">Upgrade pts</div>
+            <div style="font-weight:800" id="hudPts">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Actions</div>
+        <div class="actions">
+          <button id="btnAttack">Attack</button>
+          <button id="btnMagic">Magic</button>
+          <button id="btnHeal">Heal</button>
+          <button id="btnDefend">Defend</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:13px;color:var(--muted)">Battle Log</div>
+          <div class="center" style="font-size:13px;color:var(--muted)">Round <span id="hudRound">1</span></div>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:13px;color:var(--muted)">Shop (Gold)</div>
+          <div style="font-size:13px;color:var(--muted)">Your Gold: <span class="gold" id="goldText">0</span></div>
+        </div>
+
+        <div id="shopList">
+          <!-- shop rows injected here -->
+        </div>
+      </div>
+
+      <div class="panel center">
+        <button id="btnRestart" style="background:linear-gradient(90deg,#7c3aed,#06b6d4);width:100%;">Restart Game</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* -----------------------------
+   Game data & initial state
+   ----------------------------- */
+const enemies = [
+  // shape types: 'circle','square','triangle'
+  { id: 'gob', name: 'Goblin', shape: 'circle', color:'#ef4444', baseHp:90, atk:12, mag:6, gold:18, xp:20 },
+  { id: 'orc',  name: 'Orc',    shape: 'square', color:'#f97316', baseHp:120, atk:16, mag:8, gold:30, xp:35 },
+  { id: 'imp',  name: 'Imp',    shape: 'triangle', color:'#f43f5e', baseHp:150, atk:20, mag:14, gold:48, xp:55 },
+  { id: 'wyt',  name: 'Wyt',    shape: 'square', color:'#7c3aed', baseHp:195, atk:26, mag:18, gold:72, xp:85 },
+  { id: 'drk',  name: 'Shadow', shape: 'circle', color:'#0ea5a4', baseHp:260, atk:34, mag:28, gold:120, xp:140 },
+];
+
+let state = {
+  player: {
+    level: 1, exp: 0, expToNext: 50, pts: 0,
+    maxHP: 120, hp: 120, atk: 18, mag: 22, def: false,
+    gold: 0, potions: 1
+  },
+  enemy: null,
+  turn: 'player',
+  round: 1,
+  busy: false
+};
+
+/* shop items */
+const shop = [
+  { id:'atk+1',  name:'Attack +3', price: 40, apply: ()=> { state.player.atk += 3; } },
+  { id:'mag+1',  name:'Magic +4',  price: 50, apply: ()=> { state.player.mag += 4; } },
+  { id:'hp+10',  name:'Max HP +14',price: 60, apply: ()=> { state.player.maxHP +=14; state.player.hp +=14; } },
+  { id:'potion', name:'Healing Potion (+60 HP)', price: 35, apply: ()=> { state.player.potions +=1; } },
+  { id:'def+1',  name:'Permanent Def +1', price: 45, apply: ()=> { state.player.defBonus = (state.player.defBonus||0) + 1; } },
+];
+
+/* UI elements */
+const el = {
+  pHP: document.getElementById('pHP'),
+  eHP: document.getElementById('eHP'),
+  pHPtext: document.getElementById('pHPtext'),
+  eHPtext: document.getElementById('eHPtext'),
+  pMaxHP: document.getElementById('pMaxHP'),
+  eMaxHP: document.getElementById('eMaxHP'),
+  pLevel: document.getElementById('pLevel'),
+  eLevel: document.getElementById('eLevel'),
+  eName: document.getElementById('eName'),
+  turnText: document.getElementById('turnText'),
+  roundText: document.getElementById('roundText'),
+  log: document.getElementById('log'),
+  xpBar: document.getElementById('xpBar'),
+  xpText: document.getElementById('xpText'),
+  hudLevel: document.getElementById('hudLevel'),
+  hudGold: document.getElementById('hudGold'),
+  hudPts: document.getElementById('hudPts'),
+  goldText: document.getElementById('goldText'),
+  shopList: document.getElementById('shopList'),
+  hudRound: document.getElementById('hudRound'),
+  enemySprite: document.getElementById('enemySprite'),
+  enemyShapeWrap: document.getElementById('enemyShapeWrap'),
+  arena: document.getElementById('arena'),
+  playerSprite: document.getElementById('playerSprite'),
+  playerShape: document.getElementById('playerShape'),
+};
+
+/* buttons */
+const btnAttack = document.getElementById('btnAttack');
+const btnMagic  = document.getElementById('btnMagic');
+const btnHeal   = document.getElementById('btnHeal');
+const btnDefend = document.getElementById('btnDefend');
+const btnRestart= document.getElementById('btnRestart');
+
+/* helpers */
+function log(text){
+  const d = document.createElement('div');
+  d.textContent = text;
+  el.log.prepend(d);
+}
+
+/* Initialize shop UI */
+function renderShop(){
+  el.shopList.innerHTML = '';
+  shop.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'shop-row';
+    row.innerHTML = `<div style="font-weight:700">${s.name}</div>
+                     <div style="display:flex;gap:8px;align-items:center">
+                       <div class="gold">${s.price}</div>
+                       <button data-id="${s.id}" class="buyBtn">Buy</button>
+                     </div>`;
+    el.shopList.appendChild(row);
+  });
+
+  // hook buy buttons
+  document.querySelectorAll('.buyBtn').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.dataset.id;
+      const item = shop.find(x => x.id === id);
+      if(!item) return;
+      if(state.player.gold < item.price) { log('Not enough gold.'); return; }
+      state.player.gold -= item.price;
+      item.apply();
+      log(`Bought: ${item.name} (-${item.price} gold).`);
+      updateUI();
+    });
+  });
+}
+
+/* spawn a CSS shape for the enemy */
+function makeEnemyShape(enemyData){
+  const wrap = document.createElement('div');
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = 'center';
+  wrap.style.justifyContent = 'center';
+  // create shape according to type
+  if(enemyData.shape === 'circle'){
+    const s = document.createElement('div');
+    s.className = 'shape circle';
+    s.style.setProperty('--c', enemyData.color);
+    wrap.appendChild(s);
+  } else if(enemyData.shape === 'square'){
+    const s = document.createElement('div');
+    s.className = 'shape square';
+    s.style.width = '96px'; s.style.height = '96px';
+    s.style.setProperty('--c', enemyData.color);
+    wrap.appendChild(s);
+    // optional horns for menacing look
+    const h1 = document.createElement('div'); h1.className = 'horns'; h1.style.opacity='0.15';
+    const h2 = document.createElement('div'); h2.className = 'horns right'; h2.style.opacity='0.15';
+    s.appendChild(h1); s.appendChild(h2);
+  } else if(enemyData.shape === 'triangle'){
+    const s = document.createElement('div');
+    s.className = 'shape triangle';
+    s.style.setProperty('--c', enemyData.color);
+    wrap.appendChild(s);
+  }
+  return wrap;
+}
+
+/* pick next enemy (scales with player level) */
+function spawnEnemy(){
+  // choose by weighted selection based on player level
+  const lvl = state.player.level;
+  // pick an enemy index influenced by level
+  const idx = Math.min(enemies.length-1, Math.floor((Math.random()*1.2 + (lvl-1)*0.35)));
+  const base = enemies[idx];
+  // scale stats a bit with level
+  const scale = 1 + (lvl-1)*0.12;
+  const enemyCopy = {
+    id: base.id,
+    name: base.name,
+    shape: base.shape,
+    color: base.color,
+    level: Math.max(1, Math.round(lvl + (Math.random()*0.9))),
+    maxHP: Math.round(base.baseHp * scale),
+    hp: Math.round(base.baseHp * scale),
+    atk: Math.round(base.atk * (1 + (lvl-1)*0.08)),
+    mag: Math.round(base.mag * (1 + (lvl-1)*0.06)),
+    gold: Math.round(base.gold * (1 + (lvl-1)*0.1)),
+    xp: Math.round(base.xp * (1 + (lvl-1)*0.12)),
+  };
+  state.enemy = enemyCopy;
+  // render enemy shape
+  el.enemyShapeWrap.innerHTML = '';
+  el.enemyShapeWrap.appendChild(makeEnemyShape(enemyCopy));
+  el.eName.textContent = enemyCopy.name;
+  el.eLevel.textContent = enemyCopy.level;
+  el.eMaxHP.textContent = enemyCopy.maxHP;
+  el.eHPtext.textContent = enemyCopy.hp;
+  el.eHP.style.width = '100%';
+  log(`A ${enemyCopy.name} (Lv ${enemyCopy.level}) appears!`);
+}
+
+/* UI update */
+function updateUI(){
+  el.pHP.style.width = Math.max(0, Math.round(state.player.hp / state.player.maxHP * 100)) + '%';
+  el.eHP.style.width = state.enemy ? Math.max(0, Math.round(state.enemy.hp / state.enemy.maxHP * 100)) + '%' : '0%';
+  el.pHPtext.textContent = state.player.hp;
+  el.pMaxHP.textContent = state.player.maxHP;
+  el.eHPtext.textContent = state.enemy ? state.enemy.hp : 0;
+  el.pLevel.textContent = state.player.level;
+  el.hudLevel.textContent = state.player.level;
+  el.xpText.textContent = `${state.player.exp} / ${state.player.expToNext}`;
+  el.xpBar.style.width = Math.max(0, Math.round(state.player.exp / state.player.expToNext * 100)) + '%';
+  el.hudGold.textContent = state.player.gold;
+  el.goldText.textContent = state.player.gold;
+  el.hudPts.textContent = state.player.pts;
+  el.hudRound.textContent = state.round;
+  el.turnText.textContent = state.turn === 'player' ? 'Player' : 'Enemy';
+  el.roundText.textContent = state.round;
+  // enable/disable action buttons
+  const disabled = state.turn !== 'player' || state.busy;
+  [btnAttack, btnMagic, btnHeal, btnDefend].forEach(b => b.disabled = disabled);
+}
+
+/* small animation helpers */
+function lunge(elm, dir = 1){
+  elm.style.transform = `translateX(${20 * dir}px) scale(1.02)`;
+  setTimeout(()=> elm.style.transform = '', 160);
+}
+function spawnProjectile(fromEl, toEl, color = '#ffd166'){
+  const arenaRect = el.arena.getBoundingClientRect();
+  const fromRect = fromEl.getBoundingClientRect();
+  const toRect = toEl.getBoundingClientRect();
+  const startX = fromRect.left + fromRect.width/2 - arenaRect.left;
+  const startY = fromRect.top + fromRect.height/2 - arenaRect.top;
+  const endX   = toRect.left + toRect.width/2 - arenaRect.left;
+  const endY   = toRect.top + toRect.height/2 - arenaRect.top;
+  const p = document.createElement('div');
+  p.className = 'projectile';
+  p.style.left = startX + 'px'; p.style.top = startY + 'px';
+  p.style.background = `radial-gradient(circle at 30% 30%, #fff6c8, ${color})`;
+  el.arena.appendChild(p);
+  return new Promise(res => {
+    const dur = 480;
+    const start = performance.now();
+    function frame(t){
+      const dt = Math.min(1,(t-start)/dur);
+      const ease = 1 - Math.pow(1-dt,3);
+      const x = startX + (endX - startX) * ease;
+      const y = startY + (endY - startY) * ease - Math.sin(ease * Math.PI) * 40;
+      p.style.left = x + 'px'; p.style.top = y + 'px';
+      if(dt < 1) requestAnimationFrame(frame);
+      else { p.remove(); res(); }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+function showDamage(x,y,text){
+  const d = document.createElement('div');
+  d.className = 'damage';
+  d.textContent = text;
+  d.style.left = x + 'px'; d.style.top = y + 'px';
+  el.arena.appendChild(d);
+  setTimeout(()=>d.remove(), 900);
+}
+function flashTarget(targetEl){
+  const f = document.createElement('div'); f.className = 'flash';
+  targetEl.appendChild(f); setTimeout(()=>f.remove(), 220);
+}
+function centerOf(elm){
+  const ar = el.arena.getBoundingClientRect();
+  const r = elm.getBoundingClientRect();
+  return { x: (r.left + r.width/2) - ar.left, y: (r.top + r.height/2) - ar.top };
+}
+
+/* Combat logic */
+async function playerAttack(isMagic=false){
+  if(state.busy || state.turn !== 'player') return;
+  state.busy = true; updateUI();
+  const atk = isMagic ? state.player.mag : state.player.atk;
+  const variance = Math.floor(Math.random()*8) - 3; // -3..+4
+  const base = Math.max(1, Math.round(atk + variance));
+  const enemyDef = state.enemy.def ? 6 : 0;
+  const damage = Math.max(1, base - enemyDef);
+  log(`Player uses ${isMagic? 'Magic' : 'Attack'} — deals ${damage} damage.`);
+  // animate
+  lunge(el.playerSprite, 1);
+  await spawnProjectile(el.playerSprite, el.enemySprite, isMagic ? '#9b8cff' : '#ffd166');
+  flashTarget(el.enemySprite);
+  const pt = centerOf(el.enemySprite);
+  showDamage(pt.x, pt.y - 20, '-' + damage);
+  state.enemy.hp = Math.max(0, state.enemy.hp - damage);
+  await sleep(300);
+  state.enemy.def = false;
+  checkEnd();
+  if(state.enemy && state.enemy.hp > 0) nextTurn();
+  state.busy = false; updateUI();
+}
+
+async function playerHeal(){
+  if(state.busy || state.turn !== 'player') return;
+  state.busy = true; updateUI();
+  // if potion available, use better heal
+  if(state.player.potions > 0){
+    state.player.potions -= 1;
+    const heal = 50;
+    log(`Used a potion — +${heal} HP.`);
+    await spawnProjectile(el.playerSprite, el.playerSprite, '#9bffb3');
+    state.player.hp = Math.min(state.player.maxHP, state.player.hp + heal);
+  } else {
+    const heal = Math.round(14 + Math.random()*12);
+    log(`Player uses Heal — +${heal} HP.`);
+    await spawnProjectile(el.playerSprite, el.playerSprite, '#9bffb3');
+    state.player.hp = Math.min(state.player.maxHP, state.player.hp + heal);
+  }
+  await sleep(300);
+  nextTurn();
+  state.busy = false; updateUI();
+}
+
+function playerDefend(){
+  if(state.busy || state.turn !== 'player') return;
+  state.player.def = true;
+  log('Player braces and will reduce incoming damage.');
+  nextTurn();
+  updateUI();
+}
+
+async function enemyTurn(){
+  if(state.busy) return;
+  state.busy = true; updateUI();
+  await sleep(650);
+  // simple AI decision
+  const e = state.enemy;
+  let choice = 'attack';
+  if(e.hp < e.maxHP * 0.25 && Math.random() < 0.55) choice = 'heal';
+  else {
+    const r = Math.random();
+    choice = r < 0.62 ? 'attack' : r < 0.86 ? 'magic' : 'defend';
+  }
+
+  if(choice === 'attack' || choice === 'magic'){
+    const atk = choice === 'magic' ? e.mag : e.atk;
+    const variance = Math.floor(Math.random()*8) - 3;
+    const base = Math.max(1, Math.round(atk + variance));
+    const playerDef = state.player.def ? 6 + (state.player.defBonus||0) : (state.player.defBonus||0);
+    const damage = Math.max(1, base - playerDef);
+    log(`Enemy uses ${choice} — deals ${damage} damage.`);
+    lunge(el.enemySprite, -1);
+    await spawnProjectile(el.enemySprite, el.playerSprite, '#ff9b9b');
+    flashTarget(el.playerSprite);
+    const pt = centerOf(el.playerSprite);
+    showDamage(pt.x, pt.y - 20, '-' + damage);
+    state.player.hp = Math.max(0, state.player.hp - damage);
+    state.player.def = false;
+  } else if(choice === 'defend'){
+    state.enemy.def = true;
+    log('Enemy braces for defense.');
+  } else if(choice === 'heal'){
+    const amount = Math.round(18 + Math.random()*26);
+    state.enemy.hp = Math.min(state.enemy.maxHP, state.enemy.hp + amount);
+    log(`Enemy drinks a potion — +${amount} HP.`);
+    await spawnProjectile(el.enemySprite, el.enemySprite, '#ffe4a3');
+  }
+
+  await sleep(400);
+  state.round++;
+  state.turn = 'player';
+  state.busy = false;
+  updateUI();
+  checkEnd();
+}
+
+/* turn management */
+function nextTurn(){
+  if(state.enemy.hp <= 0) return;
+  state.turn = 'enemy';
+  updateUI();
+  setTimeout(() => { if(state.turn === 'enemy') enemyTurn(); }, 450);
+}
+
+/* end checks */
+function checkEnd(){
+  if(state.enemy.hp <= 0){
+    state.enemy.hp = 0; updateUI(); endBattle('win');
+    return true;
+  }
+  if(state.player.hp <= 0){
+    state.player.hp = 0; updateUI(); endBattle('lose');
+    return true;
+  }
+  return false;
+}
+
+/* end-of-battle handling */
+function endBattle(result){
+  state.busy = true;
+  if(result === 'win'){
+    const g = state.enemy.gold + Math.round(state.enemy.level * 3);
+    const xp = state.enemy.xp + Math.round(state.enemy.level * 6);
+    state.player.gold += g;
+    state.player.exp += xp;
+    log(`Victory! Gained ${g} gold and ${xp} XP.`);
+    // level up check
+    while(state.player.exp >= state.player.expToNext){
+      state.player.exp -= state.player.expToNext;
+      levelUp();
+    }
+    updateUI();
+    // spawn overlay with continue button
+    showOverlay(`${state.enemy.name} defeated!`, `Gold +${g} • XP +${xp}`, 'Continue', () => {
+      removeOverlay();
+      spawnEnemy();
+      state.turn = 'player';
+      state.round = 1;
+      state.busy = false;
+      updateUI();
+    });
+  } else {
+    log(`You were defeated by the ${state.enemy.name}...`);
+    showOverlay('Defeated', 'You fell in battle.', 'Restart', () => {
+      removeOverlay();
+      restartGame();
+    });
+  }
+}
+
+/* leveling */
+function levelUp(){
+  state.player.level++;
+  state.player.pts += 2;
+  // increase base stats modestly
+  state.player.maxHP += 14;
+  state.player.hp = state.player.maxHP;
+  state.player.atk += 3;
+  state.player.mag += 2;
+  state.player.expToNext = Math.round(state.player.expToNext * 1.25);
+  log(`Level Up! You are now Lv ${state.player.level}. +2 upgrade points.`);
+}
+
+/* overlay util */
+function showOverlay(title, subtitle, buttonText, onClick){
+  const ov = document.createElement('div'); ov.className = 'overlay'; ov.id = 'overlay';
+  ov.innerHTML = `<div class="card"><div style="font-size:20px;font-weight:800;margin-bottom:6px">${title}</div>
+    <div style="color:var(--muted);margin-bottom:12px">${subtitle}</div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button id="ovBtn" class="action">${buttonText}</button>
+    </div></div>`;
+  document.getElementById('game').appendChild(ov);
+  document.getElementById('ovBtn').addEventListener('click', onClick);
+}
+function removeOverlay(){ const ov = document.getElementById('overlay'); if(ov) ov.remove(); }
+
+/* small sleeps */
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* game restart */
+function restartGame(){
+  state.player = {
+    level:1, exp:0, expToNext:50, pts:0,
+    maxHP:120, hp:120, atk:18, mag:22, def:false,
+    gold:0, potions:1, defBonus:0
+  };
+  state.turn = 'player';
+  state.round = 1;
+  state.busy = false;
+  el.log.innerHTML = '';
+  spawnEnemy();
+  updateUI();
+  renderShop();
+}
+
+/* spend upgrade points UI (when points available) */
+function openUpgradePanel(){
+  if(state.player.pts <= 0) { log('No upgrade points.'); return; }
+  showOverlay('Spend Upgrade Point', `You have ${state.player.pts} points. Spend one to upgrade:`, 'Close', () => { removeOverlay(); state.busy=false; updateUI(); });
+  // add upgrade buttons inside overlay
+  const card = document.querySelector('.overlay .card');
+  const btns = document.createElement('div'); btns.style.marginTop='10px'; btns.style.display='flex'; btns.style.gap='8px'; btns.style.justifyContent='center';
+  const makeBtn = (label, fn) => {
+    const b = document.createElement('button'); b.textContent = label; b.style.padding='8px 12px';
+    b.addEventListener('click', ()=> { fn(); removeOverlay(); updateUI(); });
+    return b;
+  };
+  btns.appendChild(makeBtn('Attack +4', ()=>{ state.player.atk += 4; state.player.pts -= 1; log('Spent 1 pt: +4 Attack'); }));
+  btns.appendChild(makeBtn('Magic +4',  ()=>{ state.player.mag += 4; state.player.pts -= 1; log('Spent 1 pt: +4 Magic'); }));
+  btns.appendChild(makeBtn('MaxHP +20', ()=>{ state.player.maxHP += 20; state.player.hp += 20; state.player.pts -= 1; log('Spent 1 pt: +20 Max HP'); }));
+  card.appendChild(btns);
+}
+
+/* wire up actions */
+btnAttack.addEventListener('click', ()=> playerAttack(false));
+btnMagic.addEventListener('click', ()=> playerAttack(true));
+btnHeal.addEventListener('click', ()=> playerHeal());
+btnDefend.addEventListener('click', ()=> playerDefend());
+btnRestart.addEventListener('click', ()=> restartGame());
+document.getElementById('hudPts').addEventListener('click', ()=> openUpgradePanel());
+
+/* render shop & initialize */
+renderShop();
+restartGame();
+updateUI();
+
+/* buy from shop updates (already wired) */
+/* also re-render shop if player's gold changes (updateUI) */
+(function watchGold(){
+  const obs = new MutationObserver(updateUI);
+  obs.observe(el.hudGold, { childList:true, subtree:true });
+})();
+
+/* keyboard shortcuts for convenience */
+window.addEventListener('keydown', (e)=> {
+  if(e.key === 'a') btnAttack.click();
+  if(e.key === 'm') btnMagic.click();
+  if(e.key === 'h') btnHeal.click();
+  if(e.key === 'd') btnDefend.click();
+});
+
+/* helper log of starting state */
+log('Welcome — fight enemies, earn gold, buy upgrades in the shop (right).');
+log('Controls: Attack (A), Magic (M), Heal (H), Defend (D).');
+updateUI();
+
+</script>
+</body>
+</html>
